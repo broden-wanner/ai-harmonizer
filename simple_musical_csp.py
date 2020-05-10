@@ -34,11 +34,12 @@ satb_tessituras = {
 
 
 class Constraint:
-    """
-    A Constraint consists of:
-    scope    : a tuple of variables
-    condition: a function that can applied to a tuple of values
-    for the variables.
+    """Constraint with a scope of variabes and the function
+
+    Attributes:
+        scope: A tuple of variables
+        condition: A function that can applied to a tuple of values
+            for the variables. It should return a boolean.
     """
     def __init__(self, scope, condition):
         self.scope = scope
@@ -63,13 +64,28 @@ def in_numeral(s, a, t, b, numeral, key):
 
 
 def no_parallel_fifths(s1, a1, t1, b1, s2, a2, t2, b2):
-    """Assert that there are no paralle fifths between all voices"""
+    """Assert that there are no parallel fifths between all voices"""
     vlq = VoiceLeadingQuartet(s1, s2, a1, a2)
     return vlq.parallelFifth()
 
 
 class SimpleHarmonizerCSP:
-    def __init__(self, m):
+    """Creates a simple harmonizer CSP
+
+    Modeled after the N-ary CSP in Russell. Each constraint can have 
+    any number of variables involved in in it.
+
+    Attributes:
+        variables: The file location of the spreadsheet
+        domains: A dictionary that maps variables to their domains
+        constraints: A list of constraints
+        variables_to_constraints: A dictionary that maps variables to the 
+            set of contstraints that they're involved in
+        parts: A dictionary of that maps parts ('s', 'a', 't', or 'b') to
+            a list of the variables in that part
+        score: A score of the four parts meant to hold the assignment
+    """
+    def __init__(self, m: int):
         """Initialize the data structures for the problem"""
         # Create a variable for each note in each part
         self.variables = []
@@ -100,10 +116,10 @@ class SimpleHarmonizerCSP:
 
         # Create a map from a variable to a set of constraints associated
         # with that variable
-        self.var_to_constraints = {var: set() for var in self.variables}
+        self.varaibles_to_constraints = {var: set() for var in self.variables}
         for con in self.constraints:
             for var in con.scope:
-                self.var_to_constraints[var].add(con)
+                self.varaibles_to_constraints[var].add(con)
 
         # Create a stream of four parts
         self.score = Score(id='mainScore')
@@ -118,7 +134,7 @@ class SimpleHarmonizerCSP:
             p.append(mes)
             self.score.insert(0, p)
 
-    def __str__(self):
+    def __str__(self) -> str:
         """String representation of the CSP"""
         return str(self.variables)
 
@@ -130,7 +146,7 @@ class SimpleHarmonizerCSP:
             print(f'{v}: {self.domains[v][0]} to {self.domains[v][-1]}')
         print('\nConstrains:')
         for v in self.variables:
-            print(f'{v}: {self.var_to_constraints[v]}')
+            print(f'{v}: {self.varaibles_to_constraints[v]}')
 
     def display_assigment(self, assignment=None):
         """Print the assignment for the CSP"""
@@ -138,11 +154,19 @@ class SimpleHarmonizerCSP:
             assignment = {}
         print(assignment)
 
+    def show_score(self):
+        """Show the score"""
+        self.score.show()
+
     def consistent(self, assignment):
-        """
-        assignment is a {variable : value} dictionary
-        returns True if all of the constraints that can be evaluated
-                        evaluate to True given assignment.
+        """Checks to see if an assignment is consistent
+
+        Arguments:
+            assignment: A {variable : value} dictionary
+        
+        Returns:
+            True if all of the constraints that can be evaluated
+                evaluate to True given assignment.
         """
         return all(
             con.holds(assignment) for con in self.constraints
