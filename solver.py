@@ -1,11 +1,12 @@
 from sortedcontainers import SortedSet
 from utils import extend
+from csp import Constraint
 
 
-def sat_up(to_do):
+def sat_up(to_do: set):
     """An arc heuristic used to order by the scope of a constraint
 
-    Arguments:
+    Args:
         to_do: A set of to-do's, which are (variable, constraint) pairs
 
     Returns:
@@ -18,10 +19,10 @@ def sat_up(to_do):
     return SortedSet(to_do, key=reciprocal_scope_length)
 
 
-def partition_domain(dom):
+def partition_domain(dom: list):
     """Partitions domain dom into two
     
-    Arguments:
+    Args:
         dom: A list of values that is a domain for a variables
 
     Returns:
@@ -48,7 +49,7 @@ class ACSolver:
         """
         Makes this CSP arc-consistent using Generalized Arc Consistency
 
-        Arguments:
+        Args:
             orig_domains: The original domains
             to_do: A set of (variable, constraint) pairs
             arc_heuristic: A function that takes a set of to_do's and orders them
@@ -110,9 +111,9 @@ class ACSolver:
                 to_do |= add_to_do
         return True, domains, checks
 
-    def new_to_do(self, var, const):
+    def new_to_do(self, var: str, const: Constraint):
         """
-        Arguments:
+        Args:
             var: A variable
             const: A constraint
 
@@ -127,7 +128,7 @@ class ACSolver:
     def any_holds(self, domains, const, env, other_vars, ind=0, checks=0):
         """Checks to see if an assigment holds for the constraint
 
-        Arguments:
+        Args:
             domains: A list of domains
             const: A constraint to check
             env: A {var: val} dictionary
@@ -157,7 +158,7 @@ class ACSolver:
     def domain_splitting(self, domains=None, to_do=None, arc_heuristic=sat_up):
         """Finds a solution to the current CSP
 
-        Attributes:
+        Args:
             domains: A list of domains
             to_do: The set of to-do's
             arc_heuristic: A function that is the arc heuristic
