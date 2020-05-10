@@ -560,3 +560,309 @@ def assign_value(Xj, Xk, csp, assignment):
 
     # No consistent assignment available
     return None
+
+
+# ______________________________________________________________________________
+# n-ary Constraint Satisfaction Problem
+
+
+class NaryCSP:
+    """
+    A nary-CSP consists of:
+    domains     : a dictionary that maps each variable to its domain
+    constraints : a list of constraints
+    variables   : a set of variables
+    var_to_const: a variable to set of constraints dictionary
+    """
+    def __init__(self, domains, constraints):
+        """Domains is a variable:domain dictionary
+        constraints is a list of constraints
+        """
+        self.variables = set(domains)
+        self.domains = domains
+        self.constraints = constraints
+        self.var_to_const = {var: set() for var in self.variables}
+        for con in constraints:
+            for var in con.scope:
+                self.var_to_const[var].add(con)
+
+    def __str__(self):
+        """String representation of CSP"""
+        return str(self.domains)
+
+    def display(self, assignment=None):
+        """More detailed string representation of CSP"""
+        if assignment is None:
+            assignment = {}
+        print(assignment)
+
+    def consistent(self, assignment):
+        """assignment is a variable:value dictionary
+        returns True if all of the constraints that can be evaluated
+                        evaluate to True given assignment.
+        """
+        return all(
+            con.holds(assignment) for con in self.constraints
+            if all(v in assignment for v in con.scope))
+
+
+class Constraint:
+    """
+    A Constraint consists of:
+    scope    : a tuple of variables
+    condition: a function that can applied to a tuple of values
+    for the variables.
+    """
+    def __init__(self, scope, condition):
+        self.scope = scope
+        self.condition = condition
+
+    def __repr__(self):
+        return self.condition.__name__ + str(self.scope)
+
+    def holds(self, assignment):
+        """Returns the value of Constraint con evaluated in assignment.
+
+        precondition: all variables are assigned in assignment
+        """
+        return self.condition(*tuple(assignment[v] for v in self.scope))
+
+
+def all_diff_constraint(*values):
+    """Returns True if all values are different, False otherwise"""
+    return len(values) is len(set(values))
+
+
+def is_word_constraint(words):
+    """Returns True if the letters concatenated form a word in words, False otherwise"""
+    def isw(*letters):
+        return "".join(letters) in words
+
+    return isw
+
+
+def meet_at_constraint(p1, p2):
+    """Returns a function that is True when the words meet at the positions (p1, p2), False otherwise"""
+    def meets(w1, w2):
+        return w1[p1] == w2[p2]
+
+    meets.__name__ = "meet_at(" + str(p1) + ',' + str(p2) + ')'
+    return meets
+
+
+def adjacent_constraint(x, y):
+    """Returns True if x and y are adjacent numbers, False otherwise"""
+    return abs(x - y) == 1
+
+
+def sum_constraint(n):
+    """Returns a function that is True when the the sum of all values is n, False otherwise"""
+    def sumv(*values):
+        return sum(values) is n
+
+    sumv.__name__ = str(n) + "==sum"
+    return sumv
+
+
+def is_constraint(val):
+    """Returns a function that is True when x is equal to val, False otherwise"""
+    def isv(x):
+        return val == x
+
+    isv.__name__ = str(val) + "=="
+    return isv
+
+
+def ne_constraint(val):
+    """Returns a function that is True when x is not equal to val, False otherwise"""
+    def nev(x):
+        return val != x
+
+    nev.__name__ = str(val) + "!="
+    return nev
+
+
+def no_heuristic(to_do):
+    return to_do
+
+
+def sat_up(to_do):
+    return SortedSet(to_do, key=lambda t: 1 / len([var for var in t[1].scope]))
+
+
+class ACSolver:
+    """Solves a CSP with arc consistency and domain splitting"""
+    def __init__(self, csp):
+        """a CSP solver that uses arc consistency
+        * csp is the CSP to be solved
+        """
+        self.csp = csp
+
+    def GAC(self, orig_domains=None, to_do=None, arc_heuristic=sat_up):
+        """
+        Makes this CSP arc-consistent using Generalized Arc Consistency
+        orig_domains: is the original domains
+        to_do       : is a set of (variable,constraint) pairs
+        returns the reduced domains (an arc-consistent variable:domain dictionary)
+        """
+        if orig_domains is None:
+            orig_domains = self.csp.domains
+        if to_do is None:
+            to_do = {(var, const)
+                     for const in self.csp.constraints for var in const.scope}
+        else:
+            to_do = to_do.copy()
+        domains = orig_domains.copy()
+        to_do = arc_heuristic(to_do)
+        checks = 0
+        while to_do:
+            var, const = to_do.pop()
+            other_vars = [ov for ov in const.scope if ov != var]
+            new_domain = set()
+            if len(other_vars) == 0:
+                for val in domains[var]:
+                    if const.holds({var: val}):
+                        new_domain.add(val)
+                    checks += 1
+                # new_domain = {val for val in domains[var]
+                #               if const.holds({var: val})}
+            elif len(other_vars) == 1:
+                other = other_vars[0]
+                for val in domains[var]:
+                    for other_val in domains[other]:
+                        checks += 1
+                        if const.holds({var: val, other: other_val}):
+                            new_domain.add(val)
+                            break
+                # new_domain = {val for val in domains[var]
+                #               if any(const.holds({var: val, other: other_val})
+                #                      for other_val in domains[other])}
+            else:  # general case
+                for val in domains[var]:
+                    holds, checks = self.any_holds(domains,
+                                                   const, {var: val},
+                                                   other_vars,
+                                                   checks=checks)
+                    if holds:
+                        new_domain.add(val)
+                # new_domain = {val for val in domains[var]
+                #               if self.any_holds(domains, const, {var: val}, other_vars)}
+            if new_domain != domains[var]:
+                domains[var] = new_domain
+                if not new_domain:
+                    return False, domains, checks
+                add_to_do = self.new_to_do(var, const).difference(to_do)
+                to_do |= add_to_do
+        return True, domains, checks
+
+    def new_to_do(self, var, const):
+        """
+        Returns new elements to be added to to_do after assigning
+        variable var in constraint const.
+        """
+        return {(nvar, nconst)
+                for nconst in self.csp.var_to_const[var] if nconst != const
+                for nvar in nconst.scope if nvar != var}
+
+    def any_holds(self, domains, const, env, other_vars, ind=0, checks=0):
+        """
+        Returns True if Constraint const holds for an assignment
+        that extends env with the variables in other_vars[ind:]
+        env is a dictionary
+        Warning: this has side effects and changes the elements of env
+        """
+        if ind == len(other_vars):
+            return const.holds(env), checks + 1
+        else:
+            var = other_vars[ind]
+            for val in domains[var]:
+                # env = dict_union(env, {var:val})  # no side effects
+                env[var] = val
+                holds, checks = self.any_holds(domains, const, env, other_vars,
+                                               ind + 1, checks)
+                if holds:
+                    return True, checks
+            return False, checks
+
+    def domain_splitting(self, domains=None, to_do=None, arc_heuristic=sat_up):
+        """
+        Return a solution to the current CSP or False if there are no solutions
+        to_do is the list of arcs to check
+        """
+        if domains is None:
+            domains = self.csp.domains
+        consistency, new_domains, _ = self.GAC(domains, to_do, arc_heuristic)
+        if not consistency:
+            return False
+        elif all(len(new_domains[var]) == 1 for var in domains):
+            return {var: first(new_domains[var]) for var in domains}
+        else:
+            var = first(x for x in self.csp.variables
+                        if len(new_domains[x]) > 1)
+            if var:
+                dom1, dom2 = partition_domain(new_domains[var])
+                new_doms1 = extend(new_domains, var, dom1)
+                new_doms2 = extend(new_domains, var, dom2)
+                to_do = self.new_to_do(var, None)
+                return self.domain_splitting(new_doms1, to_do, arc_heuristic) or \
+                       self.domain_splitting(new_doms2, to_do, arc_heuristic)
+
+
+def partition_domain(dom):
+    """Partitions domain dom into two"""
+    split = len(dom) // 2
+    dom1 = set(list(dom)[:split])
+    dom2 = dom - dom1
+    return dom1, dom2
+
+
+class ACSearchSolver(search.Problem):
+    """A search problem with arc consistency and domain splitting
+    A node is a CSP"""
+    def __init__(self, csp, arc_heuristic=sat_up):
+        self.cons = ACSolver(csp)
+        consistency, self.domains, _ = self.cons.GAC(
+            arc_heuristic=arc_heuristic)
+        if not consistency:
+            raise Exception('CSP is inconsistent')
+        self.heuristic = arc_heuristic
+        super().__init__(self.domains)
+
+    def goal_test(self, node):
+        """Node is a goal if all domains have 1 element"""
+        return all(len(node[var]) == 1 for var in node)
+
+    def actions(self, state):
+        var = first(x for x in state if len(state[x]) > 1)
+        neighs = []
+        if var:
+            dom1, dom2 = partition_domain(state[var])
+            to_do = self.cons.new_to_do(var, None)
+            for dom in [dom1, dom2]:
+                new_domains = extend(state, var, dom)
+                consistency, cons_doms, _ = self.cons.GAC(
+                    new_domains, to_do, self.heuristic)
+                if consistency:
+                    neighs.append(cons_doms)
+        return neighs
+
+    def result(self, state, action):
+        return action
+
+
+def ac_solver(csp, arc_heuristic=sat_up):
+    """Arc consistency (domain splitting interface)"""
+    return ACSolver(csp).domain_splitting(arc_heuristic=arc_heuristic)
+
+
+def ac_search_solver(csp, arc_heuristic=sat_up):
+    """Arc consistency (search interface)"""
+    from search import depth_first_tree_search
+    solution = None
+    try:
+        solution = depth_first_tree_search(
+            ACSearchSolver(csp, arc_heuristic=arc_heuristic)).state
+    except:
+        return solution
+    if solution:
+        return {var: first(solution[var]) for var in solution}
