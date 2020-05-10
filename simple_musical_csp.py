@@ -73,9 +73,14 @@ class SimpleHarmonizerCSP:
         """Initialize the data structures for the problem"""
         # Create a variable for each note in each part
         self.variables = []
+        self.parts = {}
         for p in 'satb':
+            self.parts[p] = []
+            # Add a variable for each of the m notes
             for i in range(1, m + 1):
-                self.variables.append(f'{p}{i}')
+                var_name = f'{p}{i}'
+                self.variables.append(var_name)
+                self.parts[p].append(var_name)
 
         # Set the domains to the parts' tessituras
         self.domains = {}
@@ -83,7 +88,22 @@ class SimpleHarmonizerCSP:
             voice = v[0]
             self.domains[v] = satb_tessituras[voice]
 
-        # Create the constraints
+        # Create the no parallel fifths constraints
+        self.constraints = []
+        for i in range(m - 1):
+            scope = []
+            for p in 'satb':
+                scope.append(self.parts[p][i])
+                scope.append(self.parts[p][i + 1])
+            con = Constraint(tuple(scope), no_parallel_fifths)
+            self.constraints.append(c)
+
+        # Create a map from a variable to a set of constraints associated
+        # with that variable
+        self.var_to_constraints = {var: set() for var in self.variables}
+        for con in self.constraints:
+            for var in con.scope:
+                self.var_to_constraints[var].add(con)
 
         # Create a stream of four parts
         self.score = Score(id='mainScore')
@@ -114,17 +134,21 @@ class SimpleHarmonizerCSP:
         """String representation of the CSP"""
         return str(self.domains)
 
-    def assign(self, var, val, assignment):
-        """Add {var: val} to assignment; Discard the old value if any."""
-        assignment[var] = val
-        self.nassigns += 1
+    def display(self, assignment=None):
+        """More detailed string representation of CSP"""
+        if assignment is None:
+            assignment = {}
+        print(assignment)
 
-    def unassign(self, var, assignment):
-        """Remove {var: val} from assignment.
-        DO NOT call this if you are changing a variable to a new value;
-        just call assign for that."""
-        if var in assignment:
-            del assignment[var]
+    def consistent(self, assignment):
+        """
+        assignment is a {variable : value} dictionary
+        returns True if all of the constraints that can be evaluated
+                        evaluate to True given assignment.
+        """
+        return all(
+            con.holds(assignment) for con in self.constraints
+            if all(v in assignment for v in con.scope))
 
 
 if __name__ == '__main__':
