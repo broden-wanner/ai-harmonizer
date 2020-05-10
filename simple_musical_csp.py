@@ -69,7 +69,7 @@ def no_parallel_fifths(s1, a1, t1, b1, s2, a2, t2, b2):
     return vlq.parallelFifth()
 
 
-class SimpleHarmonizerCSP:
+class SimpleHarmonizerCSP(NaryCSP):
     """Creates a simple harmonizer CSP
 
     Modeled after the N-ary CSP in Russell. Each constraint can have 
