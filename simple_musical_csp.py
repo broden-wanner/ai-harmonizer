@@ -4,6 +4,7 @@ from music21.stream import Score, Measure, Part
 from music21.chord import Chord
 from music21.voiceLeading import VoiceLeadingQuartet
 from music21.roman import romanNumeralFromChord
+from music21.clef import BassClef, TrebleClef
 
 
 def tessitura(bottom, top):
@@ -64,8 +65,7 @@ def in_numeral(s, a, t, b, numeral, key):
 def no_parallel_fifths(s1, a1, t1, b1, s2, a2, t2, b2):
     """Assert that there are no paralle fifths between all voices"""
     vlq = VoiceLeadingQuartet(s1, s2, a1, a2)
-    if vlq.parallelFifth():
-        return False
+    return vlq.parallelFifth()
 
 
 class SimpleHarmonizerCSP:
@@ -96,7 +96,7 @@ class SimpleHarmonizerCSP:
                 scope.append(self.parts[p][i])
                 scope.append(self.parts[p][i + 1])
             con = Constraint(tuple(scope), no_parallel_fifths)
-            self.constraints.append(c)
+            self.constraints.append(con)
 
         # Create a map from a variable to a set of constraints associated
         # with that variable
@@ -111,31 +111,29 @@ class SimpleHarmonizerCSP:
         alt = Part(id='Alto')
         ten = Part(id='Tenor')
         bas = Part(id='Bass')
-
-        m01 = Measure(number=1)
-        sop.append(m01)
-
-        m11 = Measure(number=1)
-        alt.append(m11)
-
-        m21 = Measure(number=1)
-        ten.append(m21)
-
-        m21 = Measure(number=1)
-        m21.append(clef.BassClef())
-        bas.append(m21)
-
         for p in [sop, alt, ten, bas]:
+            mes = Measure(number=1)
+            if p.id == 'Bass':
+                mes.append(BassClef())
+            p.append(mes)
             self.score.insert(0, p)
-
-        self.nassigns = 0
 
     def __str__(self):
         """String representation of the CSP"""
-        return str(self.domains)
+        return str(self.variables)
 
-    def display(self, assignment=None):
-        """More detailed string representation of CSP"""
+    def display(self):
+        """Print stats for the csp"""
+        print(f'Variables: {", ".join(self.variables)}')
+        print('\nDomains:')
+        for v in self.variables:
+            print(f'{v}: {self.domains[v][0]} to {self.domains[v][-1]}')
+        print('\nConstrains:')
+        for v in self.variables:
+            print(f'{v}: {self.var_to_constraints[v]}')
+
+    def display_assigment(self, assignment=None):
+        """Print the assignment for the CSP"""
         if assignment is None:
             assignment = {}
         print(assignment)
@@ -152,5 +150,5 @@ class SimpleHarmonizerCSP:
 
 
 if __name__ == '__main__':
-    t = tessitura(Note('G4'), Note('G5'))
-    print(t)
+    csp = SimpleHarmonizerCSP(4)
+    csp.display()
