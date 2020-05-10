@@ -68,7 +68,33 @@ def no_parallel_fifths(s1, a1, t1, b1, s2, a2, t2, b2):
     return vlq.parallelFifth()
 
 
-class SimpleHarmonizerCSP:
+class NaryCSP:
+    """An abstract class for an n-ary CSP
+
+    Attributes:
+        variables: The file location of the spreadsheet
+        domains: A dictionary that maps variables to their domains
+        constraints: A list of constraints
+        variables_to_constraints: A dictionary that maps variables to the 
+            set of contstraints that they're involved in
+    """
+    def __init__(self, domains, constraints):
+        """Initialize the CSP
+
+        Args:
+            domains: A {variable : domain} dictionary
+            constraints: A list of constraints
+        """
+        self.variables = set(domains)
+        self.domains = domains
+        self.constraints = constraints
+        self.var_to_const = {var: set() for var in self.variables}
+        for con in constraints:
+            for var in con.scope:
+                self.var_to_const[var].add(con)
+
+
+class SimpleHarmonizerCSP(NaryCSP):
     """Creates a simple harmonizer CSP
 
     Modeled after the N-ary CSP in Russell. Each constraint can have 

@@ -1,6 +1,6 @@
 from sortedcontainers import SortedSet
 from utils import extend
-from csp import Constraint
+from csp import Constraint, NaryCSP
 
 
 def sat_up(to_do: set):
@@ -41,7 +41,7 @@ class ACSolver:
     Attributes:
         csp: The CSP problem to be solved
     """
-    def __init__(self, csp):
+    def __init__(self, csp: NaryCSP):
         """A CSP solver that uses arc consistency"""
         self.csp = csp
 
