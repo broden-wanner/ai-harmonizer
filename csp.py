@@ -5,8 +5,11 @@ from music21.voiceLeading import VoiceLeadingQuartet
 from music21.roman import romanNumeralFromChord
 from music21.clef import BassClef, TrebleClef
 
+Note.__hash__ = lambda self: hash(self.nameWithOctave)
+# ^ Add hash function to Note
 
-def tessitura(bottom, top):
+
+def tessitura(bottom, top, key=None):
     """Generate all possible notes between two notes"""
     all_notes = []
     o = bottom.octave
@@ -18,17 +21,17 @@ def tessitura(bottom, top):
             notes = notes[:notes.find(top.name[0]) + 1]
 
         for n in notes:
-            for acc in ['', '-', '#', '--', '##']:
+            for acc in ['', '-', '#']:
                 all_notes.append(Note(f'{n}{acc}{o}'))
         o += 1
     return all_notes
 
 
 satb_tessituras = {
-    's': tessitura(Note('G4'), Note('A5')),
-    'a': tessitura(Note('A4'), Note('C5')),
-    't': tessitura(Note('C3'), Note('G4')),
-    'b': tessitura(Note('C2'), Note('D4'))
+    's': [Note('G4')],
+    'a': [Note('F4')],
+    't': [Note('E4')],
+    'b': [Note('D4')]
 }
 
 
@@ -63,9 +66,9 @@ def in_numeral(s, a, t, b, numeral, key):
 
 
 def no_parallel_fifths(s1, a1, t1, b1, s2, a2, t2, b2):
-    """Assert that there are no parallel fifths between all voices"""
+    """Assert that there are no parallel fifths between all 4 voices"""
     vlq = VoiceLeadingQuartet(s1, s2, a1, a2)
-    return vlq.parallelFifth()
+    return not vlq.parallelFifth()
 
 
 class NaryCSP:
@@ -108,17 +111,23 @@ class SimpleHarmonizerCSP(NaryCSP):
             set of contstraints that they're involved in
         parts: A dictionary of that maps parts ('s', 'a', 't', or 'b') to
             a list of the variables in that part
-        score: A score of the four parts meant to hold the assignment
     """
-    def __init__(self, m: int):
-        """Initialize the data structures for the problem"""
+    def __init__(self, notes: int, parts=['s', 'a', 't', 'b']):
+        """Initialize the data structures for the problem
+        
+        Args:
+            notes: Number of notes for the csp
+            parts: A list of the parts for the csp. Can contain
+                's' (soprano), 'a' (alto), 't' (tenor), or 'b' (bass)
+        """
         # Create a variable for each note in each part
+        self.notes = notes
         self.variables = []
         self.parts = {}
-        for p in 'satb':
+        for p in parts:
             self.parts[p] = []
             # Add a variable for each of the m notes
-            for i in range(1, m + 1):
+            for i in range(1, notes + 1):
                 var_name = f'{p}{i}'
                 self.variables.append(var_name)
                 self.parts[p].append(var_name)
@@ -131,7 +140,7 @@ class SimpleHarmonizerCSP(NaryCSP):
 
         # Create the no parallel fifths constraints
         self.constraints = []
-        for i in range(m - 1):
+        for i in range(notes - 1):
             scope = []
             for p in 'satb':
                 scope.append(self.parts[p][i])
@@ -141,23 +150,10 @@ class SimpleHarmonizerCSP(NaryCSP):
 
         # Create a map from a variable to a set of constraints associated
         # with that variable
-        self.varaibles_to_constraints = {var: set() for var in self.variables}
+        self.variables_to_constraints = {var: set() for var in self.variables}
         for con in self.constraints:
             for var in con.scope:
-                self.varaibles_to_constraints[var].add(con)
-
-        # Create a stream of four parts
-        self.score = Score(id='mainScore')
-        sop = Part(id='Soprano')
-        alt = Part(id='Alto')
-        ten = Part(id='Tenor')
-        bas = Part(id='Bass')
-        for p in [sop, alt, ten, bas]:
-            mes = Measure(number=1)
-            if p.id == 'Bass':
-                mes.append(BassClef())
-            p.append(mes)
-            self.score.insert(0, p)
+                self.variables_to_constraints[var].add(con)
 
     def __str__(self) -> str:
         """String representation of the CSP"""
@@ -166,12 +162,13 @@ class SimpleHarmonizerCSP(NaryCSP):
     def display(self):
         """Print stats for the csp"""
         print(f'Variables: {", ".join(self.variables)}')
-        print('\nDomains:')
+        print('\nDomain Size:')
         for v in self.variables:
-            print(f'{v}: {self.domains[v][0]} to {self.domains[v][-1]}')
-        print('\nConstrains:')
+            print(f'{v}: {len(self.domains[v])}')
+        print('\nConstraints:')
         for v in self.variables:
-            print(f'{v}: {self.varaibles_to_constraints[v]}')
+            print(f'{v}: {self.variables_to_constraints[v]}')
+        print()
 
     def display_assigment(self, assignment=None):
         """Print the assignment for the CSP"""

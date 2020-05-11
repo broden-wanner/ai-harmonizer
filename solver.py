@@ -1,6 +1,9 @@
+import search
 from sortedcontainers import SortedSet
-from utils import extend
-from csp import Constraint, NaryCSP
+from search import depth_first_tree_search
+from utils import extend, first
+from csp import Constraint, NaryCSP, SimpleHarmonizerCSP
+from display import show_sovler_solution
 
 
 def sat_up(to_do: set):
@@ -45,7 +48,11 @@ class ACSolver:
         """A CSP solver that uses arc consistency"""
         self.csp = csp
 
-    def GAC(self, orig_domains=None, to_do=None, arc_heuristic=sat_up):
+    def GAC(self,
+            orig_domains=None,
+            to_do=None,
+            arc_heuristic=sat_up,
+            debug=False):
         """
         Makes this CSP arc-consistent using Generalized Arc Consistency
 
@@ -72,7 +79,11 @@ class ACSolver:
         checks = 0
 
         while to_do:
+            debug and print(f'To-do set size: {len(to_do)}')
+
             var, const = to_do.pop()
+            debug and print(f'Variable to examine: {var}')
+
             other_vars = [ov for ov in const.scope if ov != var]
             new_domain = set()
             if len(other_vars) == 0:
@@ -93,22 +104,32 @@ class ACSolver:
                 # new_domain = {val for val in domains[var]
                 #               if any(const.holds({var: val, other: other_val})
                 #                      for other_val in domains[other])}
-            else:  # general case
+            else:
+                # General case
                 for val in domains[var]:
+                    if debug:
+                        print(f'Seeing if {var} = {val} holds:')
+                        print(f'\tdomain for {var} is {domains[var]}')
                     holds, checks = self.any_holds(domains,
                                                    const, {var: val},
                                                    other_vars,
-                                                   checks=checks)
+                                                   checks=checks,
+                                                   debug=debug)
+
+                    debug and print(f'\n{var} = {val} holds?: {holds}')
                     if holds:
                         new_domain.add(val)
                 # new_domain = {val for val in domains[var]
                 #               if self.any_holds(domains, const, {var: val}, other_vars)}
+
             if new_domain != domains[var]:
                 domains[var] = new_domain
                 if not new_domain:
                     return False, domains, checks
                 add_to_do = self.new_to_do(var, const).difference(to_do)
                 to_do |= add_to_do
+
+            debug and print()
         return True, domains, checks
 
     def new_to_do(self, var: str, const: Constraint):
@@ -125,7 +146,14 @@ class ACSolver:
                 for nconst in self.csp.variables_to_constraints[var]
                 if nconst != const for nvar in nconst.scope if nvar != var}
 
-    def any_holds(self, domains, const, env, other_vars, ind=0, checks=0):
+    def any_holds(self,
+                  domains,
+                  const,
+                  env,
+                  other_vars,
+                  ind=0,
+                  checks=0,
+                  debug=False):
         """Checks to see if an assigment holds for the constraint
 
         Args:
@@ -142,6 +170,9 @@ class ACSolver:
             env is a dictionary.
             Warning: this has side effects and changes the elements of env
         """
+        if debug and checks % 1000 == 0:
+            print(f'\rChecks: {checks}', end='')
+
         if ind == len(other_vars):
             return const.holds(env), checks + 1
         else:
@@ -149,8 +180,13 @@ class ACSolver:
             for val in domains[var]:
                 # env = dict_union(env, {var:val})  # no side effects
                 env[var] = val
-                holds, checks = self.any_holds(domains, const, env, other_vars,
-                                               ind + 1, checks)
+                holds, checks = self.any_holds(domains,
+                                               const,
+                                               env,
+                                               other_vars,
+                                               ind + 1,
+                                               checks,
+                                               debug=debug)
                 if holds:
                     return True, checks
             return False, checks
@@ -186,5 +222,77 @@ class ACSolver:
                        self.domain_splitting(new_doms2, to_do, arc_heuristic)
 
 
+class ACSearchSolver(search.Problem):
+    """A search problem with generalized arcy consistency and domain splitting
+
+    Attributes:
+        csp: An instance of an NaryCSP
+        cons: An instance of ACSolver seeded with the csp
+        heuristic: A function meant to be used as the heuristic
+        domains: The dictionary mapping variables to their domains
+    """
+    def __init__(self, csp: NaryCSP, arc_heuristic=sat_up, debug=False):
+        self.csp = csp
+        self.acsolver = ACSolver(csp)
+        consistent, domains, checks = self.acsolver.GAC(arc_heuristic=sat_up,
+                                                        debug=debug)
+        if not consistent:
+            raise Exception('CSP is inconsistent')
+
+        self.domains = domains
+        self.heuristic = arc_heuristic
+        super().__init__(self.domains)
+
+    def goal_test(self, node) -> bool:
+        """Node is a goal if all domains have 1 element"""
+        return all(len(node[var]) == 1 for var in node)
+
+    def actions(self, state):
+        """Enumerate all actions for a certain state"""
+        var = first(x for x in state if len(state[x]) > 1)
+        neighs = []
+        if var:
+            domain1, domain2 = partition_domain(state[var])
+            to_do = self.acsolver.new_to_do(var, None)
+            for d in [domain1, domain2]:
+                new_domains = extend(state, var, dom)
+                consistent, cons_domains, checks = self.acsolver.GAC(
+                    new_domains, to_do, self.heuristic)
+                if consistent:
+                    neighs.append(cons_domains)
+        return neighs
+
+    def result(self, state, action):
+        """Return the result of taking an action in a state"""
+        return action
+
+    def search_solve(self):
+        """Find solution using depth-first search"""
+        solution = None
+        try:
+            solution = depth_first_tree_search(self).state
+        except Exception as e:
+            print(f'Exception raised in solver: {e}')
+            return solution
+        if solution:
+            return {var: first(solution[var]) for var in solution}
+
+
 if __name__ == '__main__':
-    pass
+    shcsp = SimpleHarmonizerCSP(4)
+    shcsp.display()
+    s = ACSolver(shcsp)
+    consistent, newdomains, checks = s.GAC(debug=False)
+    print(f'Is consistent?: {consistent}')
+    print(f'Checks: {checks}')
+    print('New Domain Sizes:')
+    for v in shcsp.variables:
+        print(f'{v}: {len(newdomains[v])}')
+
+    print('Solution:')
+    print(s.domain_splitting())
+
+    s_prime = ACSearchSolver(shcsp)
+    sol = s_prime.search_solve()
+
+    show_sovler_solution(sol, shcsp.parts, method='music')
