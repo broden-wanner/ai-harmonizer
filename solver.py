@@ -8,7 +8,7 @@ from music21.key import Key
 
 
 def sat_up(to_do: set):
-    """An arc heuristic used to order by the scope of a constraint
+    """An arc heuristic used to order by the scope of a constraint in increasing order
 
     Args:
         to_do: A set of to-do's, which are (variable, constraint) pairs
@@ -235,8 +235,8 @@ class ACSearchSolver(search.Problem):
     def __init__(self, csp: NaryCSP, arc_heuristic=sat_up, debug=False):
         self.csp = csp
         self.acsolver = ACSolver(csp)
-        consistent, domains, checks = self.acsolver.GAC(arc_heuristic=sat_up,
-                                                        debug=debug)
+        consistent, domains, checks = self.acsolver.GAC(
+            arc_heuristic=arc_heuristic, debug=debug)
         if not consistent:
             raise Exception('CSP is inconsistent')
 
@@ -283,10 +283,11 @@ if __name__ == '__main__':
     shcsp = SimpleHarmonizerCSP(
         name='Test',
         notes=8,
-        numerals=['I', 'IV', 'V', 'vi', 'I', 'ii', 'V', 'I'],
-        part_list=['s', 'a'],
-        key=Key('C#'))
+        numerals=['I', 'IV', 'vii', 'iii', 'vi', 'ii', 'V', 'I'],
+        part_list=['s', 't', 'b'],
+        key=Key('Db'))
     shcsp.display()
+
     s = ACSolver(shcsp)
     print('[INFO] Beginning GAC')
     consistent, newdomains, checks = s.GAC()
@@ -297,15 +298,20 @@ if __name__ == '__main__':
         print(f'{v}: {len(newdomains[v])}')
     print('[INFO] Finished GAC')
 
-    print('Solution:')
-    sol1 = s.domain_splitting()
-    print('[INFO] Found domain splitting solution')
+    if consistent:
+        print('[INFO] The CSP is consistent!')
+        sol1 = s.domain_splitting()
+        print('[INFO] Found domain splitting solution')
 
-    s_prime = ACSearchSolver(shcsp)
-    sol2 = s_prime.search_solve()
-    print('[INFO] Found search solution')
+        # s_prime = ACSearchSolver(shcsp)
+        # sol2 = s_prime.search_solve()
+        # print('[INFO] Found search solution')
 
-    print('Domain splitting solution:')
-    show_sovler_solution(solution=sol1, csp=shcsp, method='text')
-    print('\nDepth-First Search solution:')
-    show_sovler_solution(solution=sol2, csp=shcsp, method='music')
+        print('Domain splitting solution:')
+        print(sol1)
+        show_sovler_solution(solution=sol1, csp=shcsp, bpm=50, method='music')
+        # print('\nDepth-First Search solution:')
+        # show_sovler_solution(solution=sol2, csp=shcsp, method='music')
+
+    else:
+        print('CSP is not consistent')

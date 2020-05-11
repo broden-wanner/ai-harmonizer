@@ -16,7 +16,7 @@ def tessitura(bottom, top, key=Key('C')):
     all_notes = []
     o = bottom.octave
     while o <= top.octave:
-        notes = 'ABCDEFG'
+        notes = 'CDEFGAB'
         if o == bottom.octave:
             notes = notes[notes.find(bottom.name[0]):]
         if o == top.octave:
@@ -100,6 +100,9 @@ class SimpleHarmonizerCSP(NaryCSP):
         """
         self.name = name
         self.notes = notes
+        if len(numerals) != notes:
+            raise Exception(
+                'Number of numerals must equal the number of notes')
         self.numerals = numerals
         self.key = key
 
@@ -107,10 +110,10 @@ class SimpleHarmonizerCSP(NaryCSP):
         if not tessituras:
             # These are the default tessituras for SATB
             satb_tessituras = {
-                's': tessitura(Note('G3'), Note('C4'), key=key),
-                'a': tessitura(Note('C4'), Note('G4'), key=key),
-                't': tessitura(Note('G3'), Note('C4'), key=key),
-                'b': tessitura(Note('C3'), Note('G3'), key=key)
+                's': tessitura(Note('G4'), Note('G5'), key=key),
+                'a': tessitura(Note('C4'), Note('C5'), key=key),
+                't': tessitura(Note('G3'), Note('G4'), key=key),
+                'b': tessitura(Note('C3'), Note('C4'), key=key)
             }
             self.tessituras = satb_tessituras
         else:
@@ -213,6 +216,8 @@ class SimpleHarmonizerCSP(NaryCSP):
 
 
 if __name__ == '__main__':
-    print(tessitura(Note('G4'), Note('G5'), Key('G-')))
     csp = SimpleHarmonizerCSP('Test', 4, ['I', 'ii', 'V', 'I'])
     csp.display()
+    for p in csp.tessituras:
+        print(p)
+        print([n.nameWithOctave for n in csp.tessituras[p]])
