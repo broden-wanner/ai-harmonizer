@@ -4,6 +4,7 @@ from search import depth_first_tree_search
 from utils import extend, first
 from csp import Constraint, NaryCSP, SimpleHarmonizerCSP
 from display import show_sovler_solution
+from music21.key import KeySignature
 
 
 def sat_up(to_do: set):
@@ -255,7 +256,7 @@ class ACSearchSolver(search.Problem):
             domain1, domain2 = partition_domain(state[var])
             to_do = self.acsolver.new_to_do(var, None)
             for d in [domain1, domain2]:
-                new_domains = extend(state, var, dom)
+                new_domains = extend(state, var, d)
                 consistent, cons_domains, checks = self.acsolver.GAC(
                     new_domains, to_do, self.heuristic)
                 if consistent:
@@ -272,17 +273,20 @@ class ACSearchSolver(search.Problem):
         try:
             solution = depth_first_tree_search(self).state
         except Exception as e:
-            print(f'Exception raised in solver: {e}')
+            print(f'Exception raised in ACSearchSolver: {e}')
             return solution
         if solution:
             return {var: first(solution[var]) for var in solution}
 
 
 if __name__ == '__main__':
-    shcsp = SimpleHarmonizerCSP(notes=4, part_list=['s', 'a'])
+    shcsp = SimpleHarmonizerCSP(name='Test',
+                                notes=2,
+                                part_list=['s', 'a'],
+                                ks=KeySignature(7))
     shcsp.display()
     s = ACSolver(shcsp)
-    consistent, newdomains, checks = s.GAC(debug=True)
+    consistent, newdomains, checks = s.GAC()
     print(f'Is consistent?: {consistent}')
     print(f'Checks: {checks}')
     print('New Domain Sizes:')
@@ -290,9 +294,12 @@ if __name__ == '__main__':
         print(f'{v}: {len(newdomains[v])}')
 
     print('Solution:')
-    print(s.domain_splitting())
+    sol1 = s.domain_splitting()
 
     s_prime = ACSearchSolver(shcsp)
-    sol = s_prime.search_solve()
+    sol2 = s_prime.search_solve()
 
-    show_sovler_solution(solution=sol, parts=shcsp.parts, method='text')
+    print('Domain splitting solution:')
+    show_sovler_solution(solution=sol1, parts=shcsp.parts, method='text')
+    print('\nDepth-First Search solution:')
+    show_sovler_solution(solution=sol2, parts=shcsp.parts, method='text')
