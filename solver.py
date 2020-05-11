@@ -281,7 +281,7 @@ class ACSearchSolver(search.Problem):
 
 if __name__ == '__main__':
     shcsp = SimpleHarmonizerCSP(name='Test',
-                                notes=2,
+                                notes=8,
                                 part_list=['s', 'a'],
                                 ks=KeySignature(7))
     shcsp.display()
@@ -302,4 +302,4 @@ if __name__ == '__main__':
     print('Domain splitting solution:')
     show_sovler_solution(solution=sol1, parts=shcsp.parts, method='text')
     print('\nDepth-First Search solution:')
-    show_sovler_solution(solution=sol2, parts=shcsp.parts, method='text')
+    show_sovler_solution(solution=sol2, parts=shcsp.parts, method='music')

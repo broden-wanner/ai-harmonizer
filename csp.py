@@ -93,6 +93,16 @@ def no_parallel_octaves(*notes) -> bool:
     return True
 
 
+def different_notes(n1, n2) -> bool:
+    """Assert that the next note is different than the current one in a single part
+
+    Args:
+        n1: First note in the part
+        n2: Next note in the pat
+    """
+    return n1 != n2
+
+
 class NaryCSP:
     """An abstract class for an n-ary CSP
 
@@ -203,6 +213,14 @@ class SimpleHarmonizerCSP(NaryCSP):
             con2 = Constraint(tuple(scope), no_parallel_octaves)
             self.constraints.append(con1)
             self.constraints.append(con2)
+
+        # Create the different notes constraints
+        for p in part_list:
+            for i in range(len(self.parts[p]) - 1):
+                n1 = self.parts[p][i]
+                n2 = self.parts[p][i + 1]
+                con = Constraint((n1, n2), different_notes)
+                self.constraints.append(con)
 
         # Create a map from a variable to a set of constraints associated
         # with that variable
