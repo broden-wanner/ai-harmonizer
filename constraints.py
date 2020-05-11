@@ -1,5 +1,5 @@
 from music21.chord import Chord
-from music21.roman import romanNumeralFromChord
+from music21.roman import romanNumeralFromChord, RomanNumeral
 from music21.voiceLeading import VoiceLeadingQuartet
 from music21.key import Key
 
@@ -69,6 +69,23 @@ def different_notes(n1, n2) -> bool:
         n2: Next note in the pat
     """
     return n1 != n2
+
+def require_root_and_third(rn: RomanNumeral):
+    """Assert that the root and the third are in the chord"""
+    root = rn.root()
+    third = rn.third
+    
+    def mandate_root_and_third(*notes) -> bool:
+        root_found = False
+        third_found = False
+        for n in notes:
+            if root.name == n.name:
+                root_found = True
+            if third.name == n.name:
+                third_found = True
+        return root_found and third_found
+
+    return mandate_root_and_third
 
 
 def all_notes_different_one_beat(*notes) -> bool:

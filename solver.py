@@ -284,7 +284,7 @@ if __name__ == '__main__':
         name='Test',
         notes=8,
         numerals=['I', 'IV', 'viio', 'iii', 'vi', 'ii', 'V7', 'I'],
-        part_list=['s', 't', 'b'],
+        part_list=['s', 'a', 't', 'b'],
         key=Key('E'))
     shcsp.display()
 
@@ -308,7 +308,6 @@ if __name__ == '__main__':
         # print('[INFO] Found search solution')
 
         print('Domain splitting solution:')
-        print(sol1)
         from music21.instrument import Horn
         horns = {'s': Horn(), 'a': Horn(), 't': Horn(), 'b': Horn()}
         show_sovler_solution(solution=sol1, csp=shcsp, bpm=50, instruments=horns, method='music')

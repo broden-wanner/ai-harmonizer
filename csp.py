@@ -177,8 +177,17 @@ class SimpleHarmonizerCSP(NaryCSP):
             scope = []
             for p in part_list:
                 scope.append(self.parts[p][i])
-            con1 = Constraint(tuple(scope), all_notes_different_one_beat)
-            self.constraints.append(con1)
+            con = Constraint(tuple(scope), all_notes_different_one_beat)
+            self.constraints.append(con)
+
+        # Create the require root and third constraint
+        for i in range(notes):
+            scope = []
+            for p in part_list:
+                scope.append(self.parts[p][i])
+            rn = RomanNumeral(numerals[i], self.key)
+            con = Constraint(tuple(scope), require_root_and_third(rn))
+            self.constraints.append(con)
 
         # Add a PAC constraint to the last two beats
         scope = []
