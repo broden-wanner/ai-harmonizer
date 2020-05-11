@@ -279,10 +279,10 @@ class ACSearchSolver(search.Problem):
 
 
 if __name__ == '__main__':
-    shcsp = SimpleHarmonizerCSP(4)
+    shcsp = SimpleHarmonizerCSP(notes=4, part_list=['s', 'a'])
     shcsp.display()
     s = ACSolver(shcsp)
-    consistent, newdomains, checks = s.GAC(debug=False)
+    consistent, newdomains, checks = s.GAC(debug=True)
     print(f'Is consistent?: {consistent}')
     print(f'Checks: {checks}')
     print('New Domain Sizes:')
@@ -295,4 +295,4 @@ if __name__ == '__main__':
     s_prime = ACSearchSolver(shcsp)
     sol = s_prime.search_solve()
 
-    show_sovler_solution(sol, shcsp.parts, method='music')
+    show_sovler_solution(solution=sol, parts=shcsp.parts, method='text')

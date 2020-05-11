@@ -65,10 +65,21 @@ def in_numeral(s, a, t, b, numeral, key):
     return numeral == rn
 
 
-def no_parallel_fifths(s1, a1, t1, b1, s2, a2, t2, b2):
-    """Assert that there are no parallel fifths between all 4 voices"""
-    vlq = VoiceLeadingQuartet(s1, s2, a1, a2)
-    return not vlq.parallelFifth()
+def no_parallel_fifths(*notes) -> bool:
+    """Assert that there are no parallel fifths between all voices
+
+    Args:
+        notes: A tuple in the form of (s1, a1, t1, b1, s2, a2, t2, b2) where the first
+            note voices come first and the second ones last
+    """
+    notes1 = notes[:len(notes) // 2]
+    notes2 = notes[len(notes) // 2:]
+    for n1 in range(len(notes1) - 1):
+        for n2 in range(len(notes2) - 1):
+            if VoiceLeadingQuartet(notes1[n1], notes2[n2], notes1[n1 + 1],
+                                   notes2[n2 + 1]).parallelFifth():
+                return False
+    return True
 
 
 class NaryCSP:
@@ -112,7 +123,7 @@ class SimpleHarmonizerCSP(NaryCSP):
         parts: A dictionary of that maps parts ('s', 'a', 't', or 'b') to
             a list of the variables in that part
     """
-    def __init__(self, notes: int, parts=['s', 'a', 't', 'b']):
+    def __init__(self, notes: int, part_list=['s', 'a', 't', 'b']):
         """Initialize the data structures for the problem
         
         Args:
@@ -124,7 +135,7 @@ class SimpleHarmonizerCSP(NaryCSP):
         self.notes = notes
         self.variables = []
         self.parts = {}
-        for p in parts:
+        for p in part_list:
             self.parts[p] = []
             # Add a variable for each of the m notes
             for i in range(1, notes + 1):
@@ -142,7 +153,7 @@ class SimpleHarmonizerCSP(NaryCSP):
         self.constraints = []
         for i in range(notes - 1):
             scope = []
-            for p in 'satb':
+            for p in part_list:
                 scope.append(self.parts[p][i])
                 scope.append(self.parts[p][i + 1])
             con = Constraint(tuple(scope), no_parallel_fifths)
