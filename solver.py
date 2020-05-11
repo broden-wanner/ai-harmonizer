@@ -283,7 +283,7 @@ if __name__ == '__main__':
     shcsp = SimpleHarmonizerCSP(
         name='Test',
         notes=8,
-        numerals=['I', 'IV', 'vii', 'iii', 'vi', 'ii', 'V', 'I'],
+        numerals=['I', 'IV', 'viio', 'iii', 'vi', 'ii', 'V', 'I'],
         part_list=['s', 't', 'b'],
         key=Key('Db'))
     shcsp.display()

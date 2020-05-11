@@ -2,7 +2,7 @@ from music21.note import Note
 from music21.stream import Score, Measure, Part
 from music21.chord import Chord
 from music21.voiceLeading import VoiceLeadingQuartet
-from music21.roman import romanNumeralFromChord
+from music21.roman import romanNumeralFromChord, RomanNumeral
 from music21.clef import BassClef, TrebleClef
 from music21.key import Key
 from constraints import *
@@ -11,7 +11,7 @@ Note.__hash__ = lambda self: hash(self.nameWithOctave)
 # ^ Add hash function to Note
 
 
-def tessitura(bottom, top, key=Key('C')):
+def tessitura(bottom: Note, top: Note, key=Key('C')):
     """Generate all possible notes between two notes (inclusive) in a given key"""
     all_notes = []
     o = bottom.octave
@@ -27,6 +27,24 @@ def tessitura(bottom, top, key=Key('C')):
             n.pitch.accidental = key.accidentalByStep(n.pitch.step)
             all_notes.append(n)
         o += 1
+    return all_notes
+
+
+def notes_from_roman(bottom, top, rn):
+    """Generate all possible not for a range that are in a roman numeral"""
+    possible_notes = []
+    for pitch in rn.pitches:
+        possible_notes.append(pitch.name)
+
+    all_notes = []
+    octave = bottom.octave
+    while octave <= top.octave:
+        for n in possible_notes:
+            actual_note = Note(f'{n}{octave}')
+            if bottom <= actual_note and actual_note <= top:
+                all_notes.append(actual_note)
+        octave += 1
+
     return all_notes
 
 
@@ -66,7 +84,9 @@ class SimpleHarmonizerCSP(NaryCSP):
         name: The name of the CSP
         notes: The number of notes in the CSP
         key: The key in which the piece will be (must be a KeySignature object)
-        tessiturats: A dictionary mapping the parts to their ranges, which is 
+        ranges: A dictionary mapping a part to a tuple of the range of the part. Different
+            from tessituras since tessituras enumerates every note in the range
+        tessituras: A dictionary mapping the parts to their ranges, which is 
             a list of all possible notes the part can use
         variables: A string list of all variables in the CSP (one per note)
         domains: A dictionary that maps variables to their domains
@@ -81,7 +101,8 @@ class SimpleHarmonizerCSP(NaryCSP):
                  notes: int,
                  numerals: list,
                  part_list=['s', 'a', 't', 'b'],
-                 tessituras=None,
+                 ranges=None,
+                 use_tessituras=False,
                  key=Key('C')):
         """Initialize the data structures for the problem
         
@@ -92,7 +113,7 @@ class SimpleHarmonizerCSP(NaryCSP):
                 length must be equal to the number of notes.
             part_list: A list of the parts for the CSP. Can contain
                 's' (soprano), 'a' (alto), 't' (tenor), or 'b' (bass)
-            tessiturats: A dictionary mapping parts to their tessituras.
+            ranges: A dictionary mapping parts to a tuple of their range.
                 It is used for the domains of each variables. If not specified,
                 then the default satb_tessituras are used.
             key: The key we would like the piece to be in. It is C Major 
@@ -106,18 +127,27 @@ class SimpleHarmonizerCSP(NaryCSP):
         self.numerals = numerals
         self.key = key
 
-        # Set the tessituras for the domains later on
-        if not tessituras:
-            # These are the default tessituras for SATB
-            satb_tessituras = {
-                's': tessitura(Note('G4'), Note('G5'), key=key),
-                'a': tessitura(Note('C4'), Note('C5'), key=key),
-                't': tessitura(Note('G3'), Note('G4'), key=key),
-                'b': tessitura(Note('C3'), Note('C4'), key=key)
+        # Set the ranges and tessituras (if needed) for the domains later on
+        self.ranges = {}
+        self.tessituras = {}
+        if not ranges:
+            # These are the default ranges and tessituras for SATB
+            self.ranges = {
+                's': (Note('G4'), Note('G5')),
+                'a': (Note('C4'), Note('C5')),
+                't': (Note('G3'), Note('G4')),
+                'b': (Note('C3'), Note('C4'))
             }
-            self.tessituras = satb_tessituras
+            self.tessituras = {
+                's': tessitura(*self.ranges['s'], key=key),
+                'a': tessitura(*self.ranges['a'], key=key),
+                't': tessitura(*self.ranges['t'], key=key),
+                'b': tessitura(*self.ranges['b'], key=key)
+            }
         else:
-            self.tessituras = tessituras
+            self.ranges = ranges
+            for p in ranges.keys():
+                self.tessituras[p] = tessitura(*self.ranges[p], key=key)
 
         # Create a variable for each note in each part
         self.variables = []
@@ -130,11 +160,20 @@ class SimpleHarmonizerCSP(NaryCSP):
                 self.variables.append(var_name)
                 self.parts[p].append(var_name)
 
-        # Set the domains to the parts' tessituras
+        # Set the domains to the parts' tessituras if desired
+        # Otherwise, set it to the notes in the roman numerals
+        # for the range of the parts
         self.domains = {}
-        for v in self.variables:
-            voice = v[0]
-            self.domains[v] = self.tessituras[voice]
+        if use_tessituras:
+            for v in self.variables:
+                part = v[0]
+                self.domains[v] = self.tessituras[part]
+        else:
+            for v in self.variables:
+                part = v[0]
+                note = int(v[1:])
+                rn = RomanNumeral(numerals[note - 1], self.key)
+                self.domains[v] = notes_from_roman(*self.ranges[part], rn)
 
         # Create the no parallel fifths or octaves constraints
         self.constraints = []
@@ -156,13 +195,15 @@ class SimpleHarmonizerCSP(NaryCSP):
                 con = Constraint((n1, n2), different_notes)
                 self.constraints.append(con)
 
-        # Create the numeral constraints
-        for i in range(notes):
-            scope = []
-            for p in part_list:
-                scope.append(self.parts[p][i])
-            con = Constraint(tuple(scope), in_numeral(numerals[i], key))
-            self.constraints.append(con)
+        # TODO: See if this is necessary
+        # # Create the numeral constraints
+        # for i in range(notes):
+        #     scope = []
+        #     for p in part_list:
+        #         scope.append(self.parts[p][i])
+        #     con = Constraint(tuple(scope), in_numeral(numerals[i], key))
+        #     print(numerals[i], key, con)
+        #     self.constraints.append(con)
 
         # Create a map from a variable to a set of constraints associated
         # with that variable
@@ -218,6 +259,4 @@ class SimpleHarmonizerCSP(NaryCSP):
 if __name__ == '__main__':
     csp = SimpleHarmonizerCSP('Test', 4, ['I', 'ii', 'V', 'I'])
     csp.display()
-    for p in csp.tessituras:
-        print(p)
-        print([n.nameWithOctave for n in csp.tessituras[p]])
+    print(csp.domains)
