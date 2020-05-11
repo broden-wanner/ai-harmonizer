@@ -283,9 +283,9 @@ if __name__ == '__main__':
     shcsp = SimpleHarmonizerCSP(
         name='Test',
         notes=8,
-        numerals=['I', 'IV', 'viio', 'iii', 'vi', 'ii', 'V', 'I'],
-        part_list=['s', 'a', 't', 'b'],
-        key=Key('Db'))
+        numerals=['I', 'IV', 'viio', 'iii', 'vi', 'ii', 'V7', 'I'],
+        part_list=['s', 't', 'b'],
+        key=Key('E'))
     shcsp.display()
 
     s = ACSolver(shcsp)
@@ -309,9 +309,11 @@ if __name__ == '__main__':
 
         print('Domain splitting solution:')
         print(sol1)
-        show_sovler_solution(solution=sol1, csp=shcsp, bpm=50, method='music')
+        from music21.instrument import Horn
+        horns = {'s': Horn(), 'a': Horn(), 't': Horn(), 'b': Horn()}
+        show_sovler_solution(solution=sol1, csp=shcsp, bpm=50, instruments=horns, method='music')
         # print('\nDepth-First Search solution:')
         # show_sovler_solution(solution=sol2, csp=shcsp, method='music')
 
     else:
-        print('CSP is not consistent')
+        print('[INFO] CSP is not consistent')

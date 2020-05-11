@@ -4,6 +4,7 @@ from music21.stream import Part, Measure, Score
 from music21.instrument import Soprano, Alto, Tenor, Bass
 from music21.clef import TrebleClef, BassClef
 from music21.tempo import MetronomeMark
+from music21.roman import romanNumeralFromChord
 
 satb_voicing = {'s': Soprano(), 'a': Alto(), 't': Tenor(), 'b': Bass()}
 
@@ -38,9 +39,14 @@ def show_sovler_solution(solution, csp, bpm=60, instruments=satb_voicing, method
         new_part.append([instruments[p], clefs[p], csp.key, m])
         s.append(new_part)
 
-    # Add tempo
-    s.recurse().getElementsByClass('Measure').append(tempo)
-    s.show('text')
+    # Add roman numerals
+    sChords = s.chordify().recurse().getElementsByClass('Chord')
+    for c in sChords:
+        rn = romanNumeralFromChord(c, csp.key)
+        c.addLyric(str(rn.figure))
+    for (i, n) in enumerate(s.parts[-1].recurse().getElementsByClass('Note')):
+        n.addLyric(str(list(sChords)[i].lyric))
+
 
     if method == 'text' or method == 'midi':
         s.show(method)
