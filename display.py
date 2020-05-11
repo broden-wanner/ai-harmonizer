@@ -5,8 +5,9 @@ from music21.instrument import Soprano, Alto, Tenor, Bass
 from music21.clef import TrebleClef, BassClef
 from music21.tempo import MetronomeMark
 
+satb_voicing = {'s': Soprano(), 'a': Alto(), 't': Tenor(), 'b': Bass()}
 
-def show_sovler_solution(solution, csp, bpm=60, method='text'):
+def show_sovler_solution(solution, csp, bpm=60, instruments=satb_voicing, method='text'):
     """Displays the solution using music21
     
     Args:
@@ -16,7 +17,6 @@ def show_sovler_solution(solution, csp, bpm=60, method='text'):
             whether to display test or music for the solution
     """
     s = Score(id='Solution Score')
-    instruments = {'s': Soprano(), 'a': Alto(), 't': Tenor(), 'b': Bass()}
     clefs = {
         's': TrebleClef(),
         'a': TrebleClef(),
@@ -25,8 +25,10 @@ def show_sovler_solution(solution, csp, bpm=60, method='text'):
     }
     tempo = MetronomeMark(number=bpm)
 
-    for p in csp.parts:
-        m = Measure([tempo])
+    for (i, p) in enumerate(csp.parts):
+        m = Measure()
+        if i == 0:
+            m.append(tempo)
 
         for i in range(1, 1 + len(csp.parts[p])):
             n = copy.deepcopy(solution[f'{p}{i}'])

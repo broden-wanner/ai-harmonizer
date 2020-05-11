@@ -27,25 +27,6 @@ class Constraint:
         return self.condition(*tuple(assignment[v] for v in self.scope))
 
 
-def in_numeral(numeral: str, key: Key):
-    """Assert that all four voices are within the numeral.
-    
-    Args:
-        numeral: A string of the numeral to adhere the chord to.
-        key: The key in which to analyze the numerals.
-
-    Returns:
-        A function that tests whether all notes are in the given 
-        roman numeral.
-    """
-    def is_n(*notes) -> bool:
-        c = Chord(notes)
-        rn = romanNumeralFromChord(c, key)
-        return numeral == rn.romanNumeralAlone
-
-    return is_n
-
-
 def no_parallel_fifths(*notes) -> bool:
     """Assert that there are no parallel fifths between all voices.
 
@@ -88,3 +69,70 @@ def different_notes(n1, n2) -> bool:
         n2: Next note in the pat
     """
     return n1 != n2
+
+
+def all_notes_different_one_beat(*notes) -> bool:
+    """Asserts that all the notes in each part are different on one beat.
+    
+    Args:
+        notes: A tuple of notes on one beat in each part.
+    """
+    return len(notes) == len(set(notes))
+
+
+# TODO: Fix this constraint
+def maximum_two_same_note_name(*notes) -> bool:
+    """Asserts that all the notes in each part are different on one beat.
+    
+    Args:
+        notes: A tuple of notes on one beat in each part.
+    """
+    name_dict = {}
+    for n in notes:
+        if n.name in name_dict:
+            name_dict[n.name] += 1
+        else:
+            name_dict[n.name] = 1
+    for n in name_dict:
+        if name_dict[n] > 1:
+            return False
+    return True
+
+
+def assert_is_pac(key):
+    """ Asserts that the two beats are a PAC.
+
+    Requirements for a PAC
+        - First chord is root position V
+        - Second chord is root position I
+        - Top voice is tonic in second chord
+    
+    Args:
+        notes: A tuple of notes formatted like (s1, a1, t1, b1, s2, a2, t2, b2)
+            in all parts
+    """
+    def is_pac(*notes) -> bool:
+        notes1 = notes[:len(notes) // 2]
+        notes2 = notes[len(notes) // 2:]
+        b1 = notes1[-1]
+        b2 = notes2[-1]
+        s1 = notes1[0]
+        s2 = notes2[0]
+        tonic = key.tonic.name
+        # Check for correct notes in bottom and top
+        if b2.name != tonic or s2.name != tonic:
+            return False
+
+        # Check for correct chord types
+        c1 = Chord(notes1)
+        c2 = Chord(notes2)
+        rn1 = romanNumeralFromChord(c1, key)
+        rn2 = romanNumeralFromChord(c2, key)
+        if rn1.figure != 'V' and rn1.figure != 'V7':
+            return False
+        if rn2.figure != 'I' and rn2.figure != 'i':
+            return False
+
+        return True
+
+    return is_pac

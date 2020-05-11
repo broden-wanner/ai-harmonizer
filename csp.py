@@ -29,6 +29,16 @@ def notes_from_roman(bottom, top, rn):
     return all_notes
 
 
+def bass_notes_from_roman(bass_note_list, rn):
+    """Returns a list of the possible bass notes given a rn.
+
+    Use to restrict the domain of the bottom voice to only the bass of
+    the chord for the roman numeral
+    """
+    b = rn.bass().name
+    return list(filter(lambda n: n.name == b, bass_note_list))
+
+
 class NaryCSP:
     """An abstract class for an n-ary CSP
 
@@ -111,9 +121,9 @@ class SimpleHarmonizerCSP(NaryCSP):
             # These are the default ranges for SATB
             self.ranges = {
                 's': (Note('G4'), Note('G5')),
-                'a': (Note('C4'), Note('C5')),
-                't': (Note('G3'), Note('G4')),
-                'b': (Note('C3'), Note('C4'))
+                'a': (Note('C4'), Note('D5')),
+                't': (Note('E3'), Note('G4')),
+                'b': (Note('C2'), Note('C4'))
             }
         else:
             self.ranges = ranges
@@ -137,6 +147,9 @@ class SimpleHarmonizerCSP(NaryCSP):
             note = int(v[1:])
             rn = RomanNumeral(numerals[note - 1], self.key)
             self.domains[v] = notes_from_roman(*self.ranges[part], rn)
+            # If it's the bottom part, restrict the domain to only those notes in the bass
+            if part == part_list[-1]:
+                self.domains[v] = bass_notes_from_roman(self.domains[v], rn)
 
         # Create the no parallel fifths or octaves constraints
         self.constraints = []
@@ -144,6 +157,7 @@ class SimpleHarmonizerCSP(NaryCSP):
             scope = []
             for p in part_list:
                 scope.append(self.parts[p][i])
+            for p in part_list:
                 scope.append(self.parts[p][i + 1])
             con1 = Constraint(tuple(scope), no_parallel_fifths)
             con2 = Constraint(tuple(scope), no_parallel_octaves)
@@ -157,6 +171,23 @@ class SimpleHarmonizerCSP(NaryCSP):
                 n2 = self.parts[p][i + 1]
                 con = Constraint((n1, n2), different_notes)
                 self.constraints.append(con)
+
+        # Create the constraint to dictate all notes on one beat must be different
+        for i in range(notes):
+            scope = []
+            for p in part_list:
+                scope.append(self.parts[p][i])
+            con1 = Constraint(tuple(scope), all_notes_different_one_beat)
+            self.constraints.append(con1)
+
+        # Add a PAC constraint to the last two beats
+        scope = []
+        for p in part_list:
+            scope.append(self.parts[p][-2])
+        for p in part_list:
+            scope.append(self.parts[p][-1])
+        con1 = Constraint(tuple(scope), assert_is_pac(key=self.key))
+        self.constraints.append(con1)
 
         # Create a map from a variable to a set of constraints associated
         # with that variable
@@ -210,6 +241,6 @@ class SimpleHarmonizerCSP(NaryCSP):
 
 
 if __name__ == '__main__':
-    csp = SimpleHarmonizerCSP('Test', 4, ['I', 'ii', 'V', 'I'])
+    csp = SimpleHarmonizerCSP('Test', 4, ['I', 'ii', 'V', 'I'], key=Key('D-'))
     csp.display()
     print(csp.domains)

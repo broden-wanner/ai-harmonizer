@@ -284,13 +284,13 @@ if __name__ == '__main__':
         name='Test',
         notes=8,
         numerals=['I', 'IV', 'viio', 'iii', 'vi', 'ii', 'V', 'I'],
-        part_list=['s', 't', 'b'],
+        part_list=['s', 'a', 't', 'b'],
         key=Key('Db'))
     shcsp.display()
 
     s = ACSolver(shcsp)
     print('[INFO] Beginning GAC')
-    consistent, newdomains, checks = s.GAC()
+    consistent, newdomains, checks = s.GAC(debug=False)
     print(f'Is consistent?: {consistent}')
     print(f'Checks: {checks}')
     print('New Domain Sizes:')
