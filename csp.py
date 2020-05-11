@@ -4,13 +4,14 @@ from music21.chord import Chord
 from music21.voiceLeading import VoiceLeadingQuartet
 from music21.roman import romanNumeralFromChord
 from music21.clef import BassClef, TrebleClef
-from music21.key import KeySignature
+from music21.key import Key
+from constraints import *
 
 Note.__hash__ = lambda self: hash(self.nameWithOctave)
 # ^ Add hash function to Note
 
 
-def tessitura(bottom, top, ks=KeySignature(0)):
+def tessitura(bottom, top, key=Key('C')):
     """Generate all possible notes between two notes (inclusive) in a given key"""
     all_notes = []
     o = bottom.octave
@@ -23,84 +24,10 @@ def tessitura(bottom, top, ks=KeySignature(0)):
 
         for n_char in notes:
             n = Note(f'{n_char}{o}')
-            n.pitch.accidental = ks.accidentalByStep(n.pitch.step)
+            n.pitch.accidental = key.accidentalByStep(n.pitch.step)
             all_notes.append(n)
         o += 1
     return all_notes
-
-
-class Constraint:
-    """Constraint with a scope of variabes and the function
-
-    Attributes:
-        scope: A tuple of variables
-        condition: A function that can applied to a tuple of values
-            for the variables. It should return a boolean.
-    """
-    def __init__(self, scope, condition):
-        self.scope = scope
-        self.condition = condition
-
-    def __repr__(self):
-        return self.condition.__name__ + str(self.scope)
-
-    def holds(self, assignment):
-        """Returns the value of Constraint con evaluated in assignment.
-
-        precondition: all variables are assigned in assignment
-        """
-        return self.condition(*tuple(assignment[v] for v in self.scope))
-
-
-def in_numeral(s, a, t, b, numeral, key):
-    """Assert that all four voices are within the numeral"""
-    c = Chord([s, a, t, b])
-    rn = romanNumeralFromChord(c, key)
-    return numeral == rn
-
-
-def no_parallel_fifths(*notes) -> bool:
-    """Assert that there are no parallel fifths between all voices
-
-    Args:
-        notes: A tuple in the form of (s1, a1, t1, b1, s2, a2, t2, b2) where the first
-            note voices come first and the second ones last
-    """
-    notes1 = notes[:len(notes) // 2]
-    notes2 = notes[len(notes) // 2:]
-    for n1 in range(len(notes1) - 1):
-        for n2 in range(len(notes2) - 1):
-            if VoiceLeadingQuartet(notes1[n1], notes2[n2], notes1[n1 + 1],
-                                   notes2[n2 + 1]).parallelFifth():
-                return False
-    return True
-
-
-def no_parallel_octaves(*notes) -> bool:
-    """Assert that there are no parallel fifths between all voices
-
-    Args:
-        notes: A tuple in the form of (s1, a1, t1, b1, s2, a2, t2, b2) where the first
-            note voices come first and the second ones last
-    """
-    notes1 = notes[:len(notes) // 2]
-    notes2 = notes[len(notes) // 2:]
-    for n1 in range(len(notes1) - 1):
-        for n2 in range(len(notes2) - 1):
-            if VoiceLeadingQuartet(notes1[n1], notes2[n2], notes1[n1 + 1],
-                                   notes2[n2 + 1]).parallelOctave():
-                return False
-    return True
-
-
-def different_notes(n1, n2) -> bool:
-    """Assert that the next note is different than the current one in a single part
-
-    Args:
-        n1: First note in the part
-        n2: Next note in the pat
-    """
-    return n1 != n2
 
 
 class NaryCSP:
@@ -152,14 +79,17 @@ class SimpleHarmonizerCSP(NaryCSP):
     def __init__(self,
                  name: str,
                  notes: int,
+                 numerals: list,
                  part_list=['s', 'a', 't', 'b'],
                  tessituras=None,
-                 ks=KeySignature(0)):
+                 key=Key('C')):
         """Initialize the data structures for the problem
         
         Args:
             name: Name for the CSP
             notes: Number of notes for the CSP
+            list: A list of all numerals (as strings) to be used in the constraints. The
+                length must be equal to the number of notes.
             part_list: A list of the parts for the CSP. Can contain
                 's' (soprano), 'a' (alto), 't' (tenor), or 'b' (bass)
             tessiturats: A dictionary mapping parts to their tessituras.
@@ -170,16 +100,17 @@ class SimpleHarmonizerCSP(NaryCSP):
         """
         self.name = name
         self.notes = notes
-        self.key = ks
+        self.numerals = numerals
+        self.key = key
 
         # Set the tessituras for the domains later on
         if not tessituras:
             # These are the default tessituras for SATB
             satb_tessituras = {
-                's': tessitura(Note('G4'), Note('C5'), ks=ks),
-                'a': tessitura(Note('C4'), Note('G4'), ks=ks),
-                't': tessitura(Note('G3'), Note('C4'), ks=ks),
-                'b': tessitura(Note('C3'), Note('G3'), ks=ks)
+                's': tessitura(Note('G3'), Note('C4'), key=key),
+                'a': tessitura(Note('C4'), Note('G4'), key=key),
+                't': tessitura(Note('G3'), Note('C4'), key=key),
+                'b': tessitura(Note('C3'), Note('G3'), key=key)
             }
             self.tessituras = satb_tessituras
         else:
@@ -222,6 +153,14 @@ class SimpleHarmonizerCSP(NaryCSP):
                 con = Constraint((n1, n2), different_notes)
                 self.constraints.append(con)
 
+        # Create the numeral constraints
+        for i in range(notes):
+            scope = []
+            for p in part_list:
+                scope.append(self.parts[p][i])
+            con = Constraint(tuple(scope), in_numeral(numerals[i], key))
+            self.constraints.append(con)
+
         # Create a map from a variable to a set of constraints associated
         # with that variable
         self.variables_to_constraints = {var: set() for var in self.variables}
@@ -242,7 +181,10 @@ class SimpleHarmonizerCSP(NaryCSP):
             print(f'{v}: {len(self.domains[v])}')
         print('Constraints:')
         for v in self.variables:
-            print(f'{v}: {self.variables_to_constraints[v]}')
+            names = [
+                c.condition.__name__ for c in self.variables_to_constraints[v]
+            ]
+            print(f'{v}: {", ".join(names)}')
         print()
 
     def display_assigment(self, assignment=None):
@@ -271,5 +213,6 @@ class SimpleHarmonizerCSP(NaryCSP):
 
 
 if __name__ == '__main__':
-    csp = SimpleHarmonizerCSP('Test', 4)
+    print(tessitura(Note('G4'), Note('G5'), Key('G-')))
+    csp = SimpleHarmonizerCSP('Test', 4, ['I', 'ii', 'V', 'I'])
     csp.display()

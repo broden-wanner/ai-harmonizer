@@ -4,7 +4,7 @@ from search import depth_first_tree_search
 from utils import extend, first
 from csp import Constraint, NaryCSP, SimpleHarmonizerCSP
 from display import show_sovler_solution
-from music21.key import KeySignature
+from music21.key import Key
 
 
 def sat_up(to_do: set):
@@ -280,26 +280,32 @@ class ACSearchSolver(search.Problem):
 
 
 if __name__ == '__main__':
-    shcsp = SimpleHarmonizerCSP(name='Test',
-                                notes=8,
-                                part_list=['s', 'a'],
-                                ks=KeySignature(7))
+    shcsp = SimpleHarmonizerCSP(
+        name='Test',
+        notes=8,
+        numerals=['I', 'IV', 'V', 'vi', 'I', 'ii', 'V', 'I'],
+        part_list=['s', 'a'],
+        key=Key('C#'))
     shcsp.display()
     s = ACSolver(shcsp)
+    print('[INFO] Beginning GAC')
     consistent, newdomains, checks = s.GAC()
     print(f'Is consistent?: {consistent}')
     print(f'Checks: {checks}')
     print('New Domain Sizes:')
     for v in shcsp.variables:
         print(f'{v}: {len(newdomains[v])}')
+    print('[INFO] Finished GAC')
 
     print('Solution:')
     sol1 = s.domain_splitting()
+    print('[INFO] Found domain splitting solution')
 
     s_prime = ACSearchSolver(shcsp)
     sol2 = s_prime.search_solve()
+    print('[INFO] Found search solution')
 
     print('Domain splitting solution:')
-    show_sovler_solution(solution=sol1, parts=shcsp.parts, method='text')
+    show_sovler_solution(solution=sol1, csp=shcsp, method='text')
     print('\nDepth-First Search solution:')
-    show_sovler_solution(solution=sol2, parts=shcsp.parts, method='music')
+    show_sovler_solution(solution=sol2, csp=shcsp, method='music')
